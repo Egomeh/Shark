@@ -91,14 +91,15 @@ public:
 
 	/// \brief List of features that are supported by an implementation.
 	enum Feature {
-		HAS_VALUE						 =  1, ///< The function can be evaluated and evalDerivative returns a meaningless value (for example std::numeric_limits<double>::quiet_nan()).
-		HAS_FIRST_DERIVATIVE             =  2, ///< The method evalDerivative is implemented for the first derivative and returns a sensible value.
-		HAS_SECOND_DERIVATIVE            =  4, ///< The method evalDerivative is implemented for the second derivative and returns a sensible value.
-		CAN_PROPOSE_STARTING_POINT       = 8, ///< The function can propose a sensible starting point to search algorithms.
+		HAS_VALUE                        =   1, ///< The function can be evaluated and evalDerivative returns a meaningless value (for example std::numeric_limits<double>::quiet_nan()).
+		HAS_FIRST_DERIVATIVE             =   2, ///< The method evalDerivative is implemented for the first derivative and returns a sensible value.
+		HAS_SECOND_DERIVATIVE            =   4, ///< The method evalDerivative is implemented for the second derivative and returns a sensible value.
+		CAN_PROPOSE_STARTING_POINT       =   8, ///< The function can propose a sensible starting point to search algorithms.
 		IS_CONSTRAINED_FEATURE           =  16, ///< The objective function is constrained.
 		HAS_CONSTRAINT_HANDLER           =  32, ///< The constraints are governed by a constraint handler which can be queried by getConstraintHandler()
-		CAN_PROVIDE_CLOSEST_FEASIBLE     = 64,	///< If the function is constrained, the method closestFeasible is implemented and returns a "repaired" solution.
-		IS_THREAD_SAFE     = 128	///< can eval or evalDerivative be called in parallel?
+		CAN_PROVIDE_CLOSEST_FEASIBLE     =  64, ///< If the function is constrained, the method closestFeasible is implemented and returns a "repaired" solution.
+		IS_THREAD_SAFE                   = 128, ///< can eval or evalDerivative be called in parallel?
+		CAN_EVALUATE_BATCH               = 256  ///< Can the objective function avaluate more than just one search point at a time?
 	};
 
 	/// This statement declares the member m_features. See Core/Flags.h for details.
@@ -142,6 +143,11 @@ public:
 	/// \brief Returns true, when the function can be usd in parallel threads.
 	bool isThreadSafe()const{
 		return m_features & IS_THREAD_SAFE;
+	}
+
+	/// \brief Returns true, when the function can evaluate a batch search points.
+	bool canEvaluateBatch()const {
+		return m_features & CAN_EVALUATE_BATCH;
 	}
 
 	/// \brief Default ctor.
@@ -265,6 +271,20 @@ public:
 	/// and if a function does not support this feature.
 	virtual ResultType evalDerivative( const SearchPointType & input, SecondOrderDerivative & derivative )const {
 		SHARK_FEATURE_EXCEPTION(HAS_SECOND_DERIVATIVE);
+	}
+
+	///  \brief Evaluates the objective function for the set of supplied arguments.
+	///  \param [in] input The set of arguments for which the function shall be evaluated.
+	///  \return The set of results of evaluating the function for the supplied argument.
+	///  \throws FeatureNotAvailableException in the default implementation
+	///  and if a function does not support this feature.
+	virtual std::vector<ResultType> evalBatch(const std::vector<SearchPointType> & input)const {
+		SHARK_FEATURE_EXCEPTION(HAS_VALUE);
+	}
+
+	/// \brief Evaluates the function. Useful together with STL-Algorithms like std::transform.
+	std::vector<ResultType> operator()(const std::vector<SearchPointType> & input) const {
+		return evalBatch(input);
 	}
 
 protected:
