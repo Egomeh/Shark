@@ -356,7 +356,7 @@ void CMA::step(ObjectiveFunctionType const& function) {
 	}
 
 	// Check if the number of Evaluations must be increased on a noisy function
-	if (function.isNoisy()) {
+	if (m_useInternalNoiseHandling) {
 		// Compute number of points to reevaluate
 		double reevalFraction = m_rLambda * m_lambda;
 		std::size_t lambdaReeval = std::lround(m_rLambda * m_lambda);

@@ -219,6 +219,14 @@ public:
 		return m_population;
 	}
 
+    bool isUsingInternalNoiseHandling() const {
+        return m_useInternalNoiseHandling;
+    }
+
+    void setInternalNoiseHandling(bool useNoiseHandling) {
+        m_useInternalNoiseHandling = useNoiseHandling;
+    }
+
 protected:
 	SHARK_EXPORT_SYMBOL  void doInit(
 		std::vector<SearchPointType> const& points,
@@ -235,6 +243,7 @@ private:
 
 	bool m_userSetMu; /// <The user set a value via setMu, do not overwrite with default
 	bool m_userSetLambda; /// <The user set a value via setMu, do not overwrite with default
+    bool m_useInternalNoiseHandling; /// <A flag that decides if the algorithm should apply internal noise handling
 	double m_initSigma; ///< use provided initial value of sigma<=0 =>algorithm chooses
 
 	RecombinationType m_recombinationType; ///< Stores the recombination type.
