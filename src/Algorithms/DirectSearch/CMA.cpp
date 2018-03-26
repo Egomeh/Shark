@@ -235,6 +235,8 @@ void CMA::doInit(
 	m_evolutionPathC.clear();
 	m_evolutionPathSigma.clear();
 	
+    m_maxNumEvaluations = 1;
+    m_limitNumberOfEvaluations = false;
 		
 	// weighting of the k-best individuals
 	m_weights.resize(m_mu);
@@ -284,6 +286,14 @@ std::vector<CMA::IndividualType> CMA::generateOffspring() const {
 }
 
 void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
+    m_population = std::vector<SolutionType>(offspring.size());
+    for (int i = 0; i < offspring.size(); ++i)
+    {
+        m_population[i].point = offspring[i].searchPoint();
+        m_population[i].value = offspring[i].unpenalizedFitness();
+    }
+
+
 	std::vector< IndividualType > selectedOffspring(m_mu);
 	ElitistSelection<IndividualType::FitnessOrdering > selection;
 	selection(offspring.begin(), offspring.end(), selectedOffspring.begin(), selectedOffspring.end());
@@ -438,6 +448,11 @@ void CMA::step(ObjectiveFunctionType const& function) {
 				m_numEvaluations -= std::max<std::size_t>(1, std::lround(rawDecrease));
 			}
 		}
+
+        if (m_limitNumberOfEvaluations)
+        {
+            m_numEvaluations = std::min(m_maxNumEvaluations, m_numEvaluations);
+        }
 	}
 	updatePopulation(offspring);
 }

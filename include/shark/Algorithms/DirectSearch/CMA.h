@@ -227,6 +227,14 @@ public:
         m_useInternalNoiseHandling = useNoiseHandling;
     }
 
+    void limitNumberOfEvaluatiosn(bool limit) {
+        m_limitNumberOfEvaluations = limit;
+    }
+
+    void setMaxNumberOfEvaluations(std::size_t maxNumberOfEvaluations) {
+        m_maxNumEvaluations = maxNumberOfEvaluations;
+    }
+
 protected:
 	SHARK_EXPORT_SYMBOL  void doInit(
 		std::vector<SearchPointType> const& points,
@@ -269,6 +277,8 @@ private:
 	std::size_t m_counter; ///< counter for generations
 	
 	std::size_t m_numEvaluations;
+    std::size_t m_maxNumEvaluations;
+    bool m_limitNumberOfEvaluations;
 	double m_numEvalIncreaseFactor;
 	double m_rLambda;
 	double m_rankChangeQuantile;
