@@ -353,7 +353,7 @@ void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
 	m_best.value = selectedOffspring[0].unpenalizedFitness();
 }
 void CMA::step(ObjectiveFunctionType const& function) {
-	std::vector<IndividualType> offspring = generateOffspring();
+    std::vector<IndividualType> offspring = generateOffspring();
 	PenalizingEvaluator penalizingEvaluator;
 	penalizingEvaluator.m_numEvaluations = m_numEvaluations;
 	penalizingEvaluator(function, offspring.begin(), offspring.end());
@@ -454,6 +454,7 @@ void CMA::step(ObjectiveFunctionType const& function) {
             m_numEvaluations = std::min(m_maxNumEvaluations, m_numEvaluations);
         }
 	}
+    m_offspring = offspring;
 	updatePopulation(offspring);
 }
 

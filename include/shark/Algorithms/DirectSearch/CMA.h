@@ -219,6 +219,10 @@ public:
 		return m_population;
 	}
 
+    std::vector<IndividualType> const& offspring() const {
+        return m_offspring;
+    }
+
     bool isUsingInternalNoiseHandling() const {
         return m_useInternalNoiseHandling;
     }
@@ -265,6 +269,7 @@ private:
 	double m_muEff;
 
 	std::vector<SolutionType> m_population;
+    std::vector<IndividualType> m_offspring;
 
 	double m_lowerBound;
 
