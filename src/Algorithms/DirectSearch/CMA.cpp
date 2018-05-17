@@ -294,9 +294,12 @@ void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
     }
 
 
-	std::vector< IndividualType > selectedOffspring(m_mu);
-	ElitistSelection<IndividualType::FitnessOrdering > selection;
-	selection(offspring.begin(), offspring.end(), selectedOffspring.begin(), selectedOffspring.end());
+    std::vector< IndividualType > selectedOffspring(m_mu);
+    std::vector< IndividualType > rejectedOffspring(m_mu);
+    ElitistSelection<IndividualType::FitnessOrdering > selection;
+    ElitistSelection<IndividualType::ReverseFitnessOrdering > rejectedSelection;
+    selection(offspring.begin(), offspring.end(), selectedOffspring.begin(), selectedOffspring.end());
+    rejectedSelection(offspring.begin(), offspring.end(), rejectedOffspring.begin(), rejectedOffspring.end());
 	m_counter++;
 	
 	RealVector z(m_numberOfVariables, 0.);
@@ -315,6 +318,16 @@ void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
 			selectedOffspring[i].searchPoint() - m_mean,
 			selectedOffspring[i].searchPoint() - m_mean
 		);
+
+        // If active updates are disabled, skip the negative part
+        if (!m_activeUpdates)
+            continue;
+
+        // The negative contribution from the worst individuals
+        noalias(Z) -= m_weights(i) * blas::outer_prod(
+            rejectedOffspring[i].searchPoint() - m_mean,
+            rejectedOffspring[i].searchPoint() - m_mean
+        );
 	}
 	double n = static_cast<double>(m_numberOfVariables);
 	double expectedChi = std::sqrt(n) * (1. - 1. / (4. * n) + 1. / (21. * n * n));

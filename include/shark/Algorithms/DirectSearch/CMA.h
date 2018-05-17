@@ -231,6 +231,10 @@ public:
         m_useInternalNoiseHandling = useNoiseHandling;
     }
 
+    void useActiveUpdates(bool useActiveUpdates) {
+        m_activeUpdates = useActiveUpdates;
+    }
+
     void limitNumberOfEvaluatiosn(bool limit) {
         m_limitNumberOfEvaluations = limit;
     }
@@ -256,6 +260,7 @@ private:
 	bool m_userSetMu; /// <The user set a value via setMu, do not overwrite with default
 	bool m_userSetLambda; /// <The user set a value via setMu, do not overwrite with default
     bool m_useInternalNoiseHandling; /// <A flag that decides if the algorithm should apply internal noise handling
+    bool m_activeUpdates; /// <Enables active updates
 	double m_initSigma; ///< use provided initial value of sigma<=0 =>algorithm chooses
 
 	RecombinationType m_recombinationType; ///< Stores the recombination type.
