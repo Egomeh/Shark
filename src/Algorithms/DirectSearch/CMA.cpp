@@ -295,11 +295,8 @@ void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
 
 
     std::vector< IndividualType > selectedOffspring(m_mu);
-    std::vector< IndividualType > rejectedOffspring(m_mu);
     ElitistSelection<IndividualType::FitnessOrdering > selection;
-    ElitistSelection<IndividualType::ReverseFitnessOrdering > rejectedSelection;
     selection(offspring.begin(), offspring.end(), selectedOffspring.begin(), selectedOffspring.end());
-    rejectedSelection(offspring.begin(), offspring.end(), rejectedOffspring.begin(), rejectedOffspring.end());
 	m_counter++;
 	
 	RealVector z(m_numberOfVariables, 0.);
@@ -318,16 +315,6 @@ void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
 			selectedOffspring[i].searchPoint() - m_mean,
 			selectedOffspring[i].searchPoint() - m_mean
 		);
-
-        // If active updates are disabled, skip the negative part
-        if (!m_activeUpdates)
-            continue;
-
-        // The negative contribution from the worst individuals
-        noalias(Z) -= m_weights(i) * blas::outer_prod(
-            rejectedOffspring[i].searchPoint() - m_mean,
-            rejectedOffspring[i].searchPoint() - m_mean
-        );
 	}
 	double n = static_cast<double>(m_numberOfVariables);
 	double expectedChi = std::sqrt(n) * (1. - 1. / (4. * n) + 1. / (21. * n * n));
@@ -341,8 +328,26 @@ void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
 
 	double deltaHSig = (1.-hSig*hSig) * m_cC * (2. - m_cC);
 
-	m_evolutionPathC = (1. - m_cC) * m_evolutionPathC + hSig * std::sqrt(m_cC * (2. - m_cC) * m_muEff) * y; // eq. (42)
-	noalias(C) = (1.-m_c1 - m_cMu) * C + m_c1 * (blas::outer_prod(m_evolutionPathC, m_evolutionPathC) + deltaHSig * C) + m_cMu * 1./sqr(m_sigma) * Z; // eq. (43)
+    m_evolutionPathC = (1. - m_cC) * m_evolutionPathC + hSig * std::sqrt(m_cC * (2. - m_cC) * m_muEff) * y; // eq. (42)
+
+    if (m_activeUpdates)
+    {
+        std::vector< IndividualType > rejectedOffspring(m_mu);
+        ElitistSelection<IndividualType::ReverseFitnessOrdering > rejectedSelection;
+        rejectedSelection(offspring.begin(), offspring.end(), rejectedOffspring.begin(), rejectedOffspring.end());
+
+        // Estimate the covariance of the rejected samples.
+        RealMatrix ZNegative(m_numberOfVariables, m_numberOfVariables, 0.0);
+        for (std::size_t i = 0; i < m_mu; i++)
+        {
+            noalias(Z) -= m_weights(i) * blas::outer_prod(
+                rejectedOffspring[i].searchPoint() - m_mean,
+                rejectedOffspring[i].searchPoint() - m_mean
+            );
+        }
+    }
+
+    noalias(C) = (1. - m_c1 - m_cMu) * C + m_c1 * (blas::outer_prod(m_evolutionPathC, m_evolutionPathC) + deltaHSig * C) + m_cMu * 1. / sqr(m_sigma) * Z; // eq. (43)
 
 	// Step size update
 	RealVector CInvY = blas::prod(m_mutationDistribution.eigenVectors(), z); // C^(-1/2)y = Bz
