@@ -238,8 +238,10 @@ void CMA::doInit(
     m_maxNumEvaluations = 1;
     m_limitNumberOfEvaluations = false;
 		
-	// weighting of the k-best individuals
-	m_weights.resize(m_mu);
+	// weighting of the k-best individuals.
+    // and the k-worst if active updtes are enabled.
+    m_weights.resize(m_mu);
+    m_negativeWeights.resize(m_mu);
 	switch (m_recombinationType) {
 	case EQUAL:
 		for (std::size_t i = 0; i < m_mu; i++)
@@ -265,7 +267,8 @@ void CMA::doInit(
 	m_c1 = 2 / (sqr(m_numberOfVariables + 1.3) + m_muEff); // eq. (48)
 	double alphaMu = 2.;
 	double rankMuAlpha = 0.3;//but is it really?
-	m_cMu = std::min(1. - m_c1, alphaMu * (rankMuAlpha + m_muEff - 2. + 1. / m_muEff) / (sqr(m_numberOfVariables + 2) + alphaMu * m_muEff / 2)); // eq. (49)
+    m_cMu = std::min(1. - m_c1, 2. * (.25 + m_muEff + 1. / m_muEff - 2.) / (std::pow(m_numberOfVariables + 2., 2.) + 2. * m_mu / 2.));
+	// m_cMu = std::min(1. - m_c1, alphaMu * (rankMuAlpha + m_muEff - 2. + 1. / m_muEff) / (sqr(m_numberOfVariables + 2) + alphaMu * m_muEff / 2)); // eq. (49)
 	
 	std::size_t pos = std::min_element(initialValues.begin(),initialValues.end())-initialValues.begin();
 	m_mean = initialSearchPoints[pos];
@@ -325,6 +328,8 @@ void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
 	if (hSigLHS < hSigRHS) {
 		hSig = 1.;
 	}
+
+    const double c1a = m_c1 * (1. - (1. - (hSig * hSig)) * m_cC * (2. - m_cC));
 
 	double deltaHSig = (1.-hSig*hSig) * m_cC * (2. - m_cC);
 
