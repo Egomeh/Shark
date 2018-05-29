@@ -244,19 +244,31 @@ void CMA::doInit(
     m_negativeWeights.resize(m_mu);
 	switch (m_recombinationType) {
 	case EQUAL:
-		for (std::size_t i = 0; i < m_mu; i++)
-			m_weights(i) = 1;
+        for (std::size_t i = 0; i < m_mu; i++)
+        {
+            m_weights(i) = 1.;
+            m_negativeWeights(i) = -1.;
+        }
 		break;
 	case LINEAR:
-		for (std::size_t i = 0; i < m_mu; i++)
-			m_weights(i) = (double)(mu-i);
+        for (std::size_t i = 0; i < m_mu; i++)
+        {
+			m_weights(i) = static_cast<double>(mu - i);
+            m_negativeWeights(i) = static_cast<double>(mu - (m_lambda - i - 1.));
+        }
 		break;
 	case SUPERLINEAR:
-		for (std::size_t i = 0; i < m_mu; i++)
-			m_weights(i) = ::log(mu + 0.5) - ::log(1. + i); // eq. (45)
+        for (std::size_t i = 0; i < m_mu; i++)
+        {
+            m_weights(i) = ::log(mu + 0.5) - ::log(1. + i); // eq. (45)
+            m_negativeWeights(i) = ::log(mu + 0.5) - ::log(1. + (m_lambda - i - 1.));
+        }
 		break;
 	}
-	m_weights /= sum(m_weights); // eq. (45)
+    const double weightSum = sum(m_weights);
+	m_weights /= weightSum; // eq. (45)
+    m_negativeWeights /= weightSum; // Normalize the negative weights.
+
 	m_muEff = 1. / sum(sqr(m_weights)); // equal to sum(m_weights)^2 / sum(sqr(m_weights))
 
 	// Step size control
@@ -267,8 +279,20 @@ void CMA::doInit(
 	m_c1 = 2 / (sqr(m_numberOfVariables + 1.3) + m_muEff); // eq. (48)
 	double alphaMu = 2.;
 	double rankMuAlpha = 0.3;//but is it really?
-    m_cMu = std::min(1. - m_c1, 2. * (.25 + m_muEff + 1. / m_muEff - 2.) / (std::pow(m_numberOfVariables + 2., 2.) + 2. * m_mu / 2.));
+    m_cMu = std::min(1. - m_c1, 2. * (.25 + m_muEff + 1. / m_muEff - 2.) / (std::pow(m_numberOfVariables + 2., 2.) + 2. * m_muEff / 2.)); // Following the PyCma code...
 	// m_cMu = std::min(1. - m_c1, alphaMu * (rankMuAlpha + m_muEff - 2. + 1. / m_muEff) / (sqr(m_numberOfVariables + 2) + alphaMu * m_muEff / 2)); // eq. (49)
+
+    // Noralize the negative weights
+    const double negativeWeightSum = sum(m_negativeWeights);
+    const double negativeMultiplier = 1. + m_c1 / m_cMu;
+    m_negativeWeights /= -negativeWeightSum;
+    m_negativeWeights *= negativeMultiplier;
+
+    // Possibly add a limit step, such that the limit of the sum of the negative value are at no less than
+    // (1 - c1 - cmu) / cmu / dimensions
+    // and 1 + 2 * muEffMinus / (mueff + 2)
+    // This is in the reference done by lowering all values by a factor to remian in the desired range.
+
 	
 	std::size_t pos = std::min_element(initialValues.begin(),initialValues.end())-initialValues.begin();
 	m_mean = initialSearchPoints[pos];

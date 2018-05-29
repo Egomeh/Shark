@@ -208,6 +208,12 @@ public:
 		RealVector const& eigenValues = m_mutationDistribution.eigenValues();
 		return max(eigenValues)/min(eigenValues); 
 	}
+
+    ///\breif Returns the muEff equivilent for the negative weigths
+    double muEffMinus() const {
+        const double sneg = sum(m_negativeWeights);
+        return (sneg * sneg) / sum(sqr(m_negativeWeights));
+    }
 	
 	///\brief Returns how often a point is evaluated 
 	std::size_t numberOfEvaluations()const{
