@@ -42,44 +42,6 @@
 #include <numeric>
 using namespace shark;
 
-
-void SetMatrixRow(RealMatrix &matrix, const RealVector &row, std::size_t rowNumber)
-{
-    assert(matrix.size2() == row.size());
-    for (std::size_t i = 0; i < row.size(); ++i)
-        matrix(rowNumber, i) = row(i);
-}
-
-RealMatrix MatrixDot(const RealMatrix &a, const RealMatrix &b)
-{
-    assert(a.size2() == b.size1());
-
-    RealMatrix result(a.size1(), b.size2(), 0.);
-    for (int i = 0; i < a.size1(); ++i)
-    {
-        for (int j = 0; j < b.size2(); ++j)
-        {
-            for (int k = 0; k < a.size2(); ++k)
-            {
-                result(i, j) += a(i, k) * b(k, j);
-            }
-        }
-    }
-
-    return result;
-}
-
-void MultiplyWeights(RealMatrix &matrix, const RealVector& weights)
-{
-    for (int i = 0; i < matrix.size1(); ++i)
-    {
-        for (int j = 0; j < matrix.size2(); ++j)
-        {
-            matrix(i, j) *= weights(j);
-        }
-    }
-}
-
 namespace{
 	//computes percentile({|1-R|,|2-R|,...,|N-R|},q)
 	int deltaLim(int rank, std::size_t N, double percentile) {
@@ -345,11 +307,10 @@ std::vector<CMA::IndividualType> CMA::generateOffspring() const {
 	std::vector< IndividualType > offspring( m_lambda );
 	for( std::size_t i = 0; i < offspring.size(); i++ ) {
 		MultiVariateNormalDistribution::result_type sample = m_mutationDistribution(*mpe_rng);
-		/*offspring[i].chromosome() = sample.second;
-		offspring[i].searchPoint() = m_mean + m_sigma * sample.first;*/
-        offspring[i].chromosome() = RealVector(10, (i + 1.) / 10.); // sample.second;
-        offspring[i].searchPoint() = RealVector(10, (i + 1.) / 10.); // m_mean + m_sigma * sample.first;
-	}
+		offspring[i].chromosome() = sample.second;
+		offspring[i].searchPoint() = m_mean + m_sigma * sample.first;
+    }
+
 	return offspring;
 }
 
@@ -393,12 +354,11 @@ void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
 	if (hSigLHS < hSigRHS) {
 		hSig = 1.;
 	}
+    // hSig = 1.;
 
     const double c1a = m_c1 * (1. - (1. - (hSig * hSig)) * m_cC * (2. - m_cC));
 
 	double deltaHSig = (1.-hSig*hSig) * m_cC * (2. - m_cC);
-
-    m_evolutionPathC = (1. - m_cC) * m_evolutionPathC + hSig * std::sqrt(m_cC * (2. - m_cC) * m_muEff) * y; // eq. (42)
 
     RealVector tempWeights(0, 0.);
     tempWeights.push_back(c1a);
@@ -422,62 +382,74 @@ void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
         std::reverse(rejectedOffspring.begin(), rejectedOffspring.end());
 
         selectedOffspring.insert(selectedOffspring.end(), rejectedOffspring.begin(), rejectedOffspring.end());
-    }
 
-    const double weightSum = std::accumulate(tempWeights.begin(), tempWeights.end(), 0.);
-    noalias(C) = C - weightSum;
+        m_evolutionPathC = (1. - m_cC) * m_evolutionPathC + hSig * (std::sqrt(m_cC * (2. - m_cC) * m_muEff) / m_sigma) * (m - m_mean);
 
-    RealMatrix B_transposed = remora::trans(m_mutationDistribution.eigenVectors());
-    RealVector D = m_mutationDistribution.eigenValues();
+        const double weightSum = std::accumulate(tempWeights.begin(), tempWeights.end(), 0.);
+        noalias(C) = C * (1. - weightSum);
 
-    RealMatrix vectors(m_numberOfVariables + 1, m_numberOfVariables);
-    SetMatrixRow(vectors, m_evolutionPathC, 0);
+        RealMatrix B_transposed = remora::trans(m_mutationDistribution.eigenVectors());
+        RealVector D = sqrt(max(m_mutationDistribution.eigenValues(), 0));
 
-    for (int k = 0; k < selectedOffspring.size(); ++k)
-    {
-        RealVector normalized = (selectedOffspring[k].searchPoint() - m_mean) / m_sigma;
-        SetMatrixRow(vectors, normalized, k + 1);
+        RealMatrix vectors(m_numberOfVariables + 1, m_numberOfVariables);
+        RealMatrix vectorsT(m_numberOfVariables, m_numberOfVariables + 1);
+        const double evolutionPathFactor = sqrt(m_c1 / (c1a + 1e-23));
+        const RealVector evolutionPath = m_evolutionPathC * evolutionPathFactor;
+        row(vectors, 0) = evolutionPath;
+        column(vectorsT, 0) = evolutionPath * tempWeights[0];
 
-        if (tempWeights[k] >= 0.)
-            continue;
-
-        RealVector BDotX = RealVector(selectedOffspring[k].searchPoint().size(), 0.);
-
-        // Perform B^T dot x
-        std::size_t size = BDotX.size();
-        for (int i = 0; i < size; ++i)
+        for (int k = 0; k < selectedOffspring.size(); ++k)
         {
-            for (int j = 0; j < size; ++j)
+            const unsigned int weightIndex = k + 1;
+            RealVector zeroMean = selectedOffspring[k].searchPoint() - m_mean;
+            RealVector normalized = zeroMean / m_sigma;
+            row(vectors, weightIndex) = normalized;
+
+            if (tempWeights[weightIndex] < 0.)
             {
-                BDotX(i) += B_transposed(i, j) * normalized(j);
+                const RealVector step1 = B_transposed % normalized;
+                const RealVector step2 = step1 / D;
+                const RealVector step3 = sqr(step2);
+                const double     step4 = sum(step3);
+                const double     step5 = sqrt(step4);
+                const double mahalanobisNorm = step5;
+                const double weightFactor = static_cast<double>(m_numberOfVariables) / sqr(mahalanobisNorm + 1e-9);
+                tempWeights[weightIndex] *= weightFactor;
             }
+
+            row(vectors, weightIndex) = normalized;
+            column(vectorsT, weightIndex) = normalized * tempWeights[weightIndex];
         }
 
-        RealVector step2 = BDotX / D;
-        RealVector step3 = sqr(step2);
-        double step4 = std::accumulate(step3.begin(), step3.end(), 0.);
-        double step5 = std::sqrt(step4);
-        const double mahalanobisNorm = step5;
+        RealMatrix updateMatrix = vectorsT % vectors;
 
-        tempWeights[k + 1] *= static_cast<double>(m_numberOfVariables) / sqr(mahalanobisNorm + 1e-9);
+        noalias(C) += updateMatrix;
+
+        // Step size update
+        RealVector ZPython = m_mutationDistribution.eigenVectors() % (trans(m_mutationDistribution.eigenVectors()) % (m - m_mean) / D);
+        ZPython *= sqrt(m_muEff) / m_sigma;
+        m_evolutionPathSigma = (1. - m_cSigma) * m_evolutionPathSigma + sqrt(m_cSigma * (2. - m_cSigma)) * ZPython;
+        m_sigma *= std::exp((m_cSigma / m_dSigma) * (norm_2(m_evolutionPathSigma) / expectedChi - 1.)); // eq. (39)
     }
+    else
+    {
+        m_evolutionPathC = (1. - m_cC) * m_evolutionPathC + hSig * std::sqrt(m_cC * (2. - m_cC) * m_muEff) * y; // eq. (42)
 
-    RealMatrix weightedTransposeMatrix = trans(vectors);
-    MultiplyWeights(weightedTransposeMatrix, tempWeights);
+        noalias(C) = (1. - m_c1 - m_cMu) * C + m_c1 * (blas::outer_prod(m_evolutionPathC, m_evolutionPathC) + deltaHSig * C) + m_cMu * 1. / sqr(m_sigma) * Z; // eq. (43)
 
-    RealMatrix updateMatrix = MatrixDot(weightedTransposeMatrix, vectors);
-
-    noalias(C) += updateMatrix;
-    // noalias(C) = (1. - m_c1 - m_cMu) * C + m_c1 * (blas::outer_prod(m_evolutionPathC, m_evolutionPathC) + deltaHSig * C) + m_cMu * 1. / sqr(m_sigma) * Z; // eq. (43)
-
-	// Step size update
-	RealVector CInvY = blas::prod(m_mutationDistribution.eigenVectors(), z); // C^(-1/2)y = Bz
-	m_evolutionPathSigma = (1. - m_cSigma)*m_evolutionPathSigma + std::sqrt( m_cSigma * (2. - m_cSigma) * m_muEff) * CInvY; // eq. (40)
-	m_sigma *= std::exp((m_cSigma / m_dSigma) * (norm_2(m_evolutionPathSigma) / expectedChi - 1.)); // eq. (39)
+        // Step size update
+        RealVector CInvY = blas::prod(m_mutationDistribution.eigenVectors(), z); // C^(-1/2)y = Bz
+        m_evolutionPathSigma = (1. - m_cSigma)*m_evolutionPathSigma + std::sqrt(m_cSigma * (2. - m_cSigma) * m_muEff) * CInvY; // eq. (40)
+        m_sigma *= std::exp((m_cSigma / m_dSigma) * (norm_2(m_evolutionPathSigma) / expectedChi - 1.)); // eq. (39)
+    }
 
 	// Update mutation distribution
 	m_mutationDistribution.update();
-	
+
+    RealMatrix newC = m_mutationDistribution.eigenVectors() % to_diagonal(m_mutationDistribution.eigenValues()) % trans(m_mutationDistribution.eigenVectors());
+
+    RealMatrix Cdiff = C - newC;
+
 	// Update mean
 	m_mean = m;
 	
