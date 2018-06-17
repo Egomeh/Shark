@@ -358,11 +358,11 @@ void CMA::updatePopulation(std::vector<IndividualType> const& offspring) {
     {
         // Copy the weights from as they are altered based on the length of the
         // the rejected solutions.
-        RealVector tempWeights(m_numberOfVariables + 1, m_cMu);
-        tempWeights(0) *= c1a;
+        RealVector tempWeights(m_numberOfVariables + 1, 0.);
+        tempWeights(0) = c1a;
         for (std::size_t i = 0; i < m_weights.size(); ++i)
         {
-            tempWeights(i + 1) *= m_weights(i);
+            tempWeights(i + 1) = m_weights(i) * m_cMu;
         }
 
         // Add rejected samples to the selected offspring
