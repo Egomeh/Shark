@@ -209,12 +209,6 @@ public:
 		return max(eigenValues)/min(eigenValues); 
 	}
 
-    ///\breif Returns the muEff equivilent for the negative weigths
-    double muEffMinus() const {
-        const double sneg = sum(m_negativeWeights);
-        return (sneg * sneg) / sum(sqr(m_negativeWeights));
-    }
-	
 	///\brief Returns how often a point is evaluated 
 	std::size_t numberOfEvaluations()const{
 		return m_numEvaluations;
@@ -286,8 +280,6 @@ private:
 
 	RealVector m_mean;
 	RealVector m_weights;
-    RealVector m_activeWeights;
-    RealVector m_negativeWeights;
 
 	RealVector m_evolutionPathC;
 	RealVector m_evolutionPathSigma;
