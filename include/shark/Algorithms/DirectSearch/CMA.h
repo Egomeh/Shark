@@ -286,6 +286,7 @@ private:
 
 	RealVector m_mean;
 	RealVector m_weights;
+    RealVector m_activeWeights;
     RealVector m_negativeWeights;
 
 	RealVector m_evolutionPathC;
